@@ -1,6 +1,6 @@
 ---
 title: "Titanic Dataset - Exploratory Data Analysis"
-author: "Vijay Kumar"
+author: "Evans Kayo"
 date: "8/27/2021"
 output:
   pdf_document: default
