@@ -1,0 +1,278 @@
+---
+title: "Titanic Dataset - Exploratory Data Analysis"
+author: "Vijay Kumar"
+date: "8/27/2021"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+# 1. Introduction
+
+The unfortunate disaster of the Titanic is a historical event known the world over. It has been re-enacted quite spectacularly in James Cameron's 1997 movie self titled Titanic. In this document, we will perform exploratory data analysis on the passenger data to explore the most important predictors for survival.
+
+
+## 2. Exploratory Data Analysis
+
+
+### 2.1 Load Libraries:
+
+
+We will begin by loading all required libraries
+
+
+```{r Libraries, echo=TRUE}
+
+library(tidyverse)
+library(RColorBrewer)
+
+
+```
+
+
+### 2.2 Load Data:
+
+
+We will then load the data into R using read.csv
+
+
+```{r Load Data, echo=TRUE}
+
+titanic <- as_tibble(read.csv('train.csv', , na.strings = c("")))
+
+glimpse(titanic)
+
+```
+There are 891 passengers and 11 attributes (PassengerId is just an index not an attribute of a passenger).
+
+
+### 2.3 Review Summary of Data:
+
+
+Check summary statistics
+
+
+```{r Summary statistics, echo=TRUE}
+
+summary(titanic)
+
+```
+
+### 2.4 Missing Values:
+
+
+Check for missing values in the dataset
+
+
+```{r Missing Values, echo=TRUE}
+
+na_count <-sapply(titanic, function(titanic) sum(length(which(is.na(titanic)))))
+na_count <- data.frame(na_count)
+na_count
+
+```
+Age has the most missing values. 19.86% of age values are missing; Too large to drop. We will set median. Cabin: 687 missing - we will likely discard this variable. Embarked: 2 missing.
+
+
+#### 2.4.1 Replace missing values with the median of age:
+
+
+Replace missing values with median and check for null values.
+
+
+```{r Median, echo=TRUE}
+
+titanic$Age[is.na(titanic$Age)] <- median(titanic$Age, na.rm=TRUE)
+na_count <-sapply(titanic, function(titanic) sum(length(which(is.na(titanic)))))
+na_count <- data.frame(na_count)
+na_count
+
+```
+No more null values. All replaced by the median.
+
+
+### 2.5 PClass Number of Passengers:
+
+
+```{r Pclass Number, echo=TRUE}
+
+titanic %>% 
+  count(Pclass) %>% 
+  mutate(proportion = round(n/sum(n)*100))
+
+```
+Passenger Class 3 was the most populated. 55% of all passengers.
+
+
+### 2.6 Check sex distribution per Pclass 
+
+
+```{r Sex Distribution, echo=TRUE}
+
+titanic %>% 
+  ggplot(aes(x=Pclass, fill=Sex)) +
+  geom_bar(position = "dodge", width = 0.4)
+
+```
+
+
+There were more males than females in all classes.
+
+
+### 2.7 Passenger class
+
+
+Check if passenger class determined death. 
+
+
+```{r Class, echo=TRUE}
+
+titanic$Survived <- as.factor(titanic$Survived)
+
+titanic %>% 
+  filter(!is.na(Survived)) %>%  
+  ggplot(aes(x=Pclass, fill=Survived))+
+  geom_bar(position='dodge')+
+  scale_fill_brewer(palette = 'Dark2')
+
+```
+
+Your chances of survival were worse in Pclass 3 than they were in pClass 1. Richer families had a better chance of survival than poorer families.
+
+
+### 2.8 Passenger Title:
+
+
+Check if passenger title determined death or survival. 
+
+
+```{r Title 1, echo=TRUE}
+
+titanic$Title <- gsub('(.*, )|(\\..*)', '', titanic$Name)
+table(titanic$Sex, titanic$Title)
+
+```
+
+Form a Table of Title & Sex
+
+
+```{r Title 2, echo=TRUE}
+
+titanic <- titanic %>% 
+  mutate(Title = case_when(Title %in% c('Master', 'Miss', 'Mr', 'Mrs') ~ Title,
+                           Title %in% c('Mlle', 'Mme', 'Ms') ~ "Miss",
+                           TRUE ~ "Other"))
+
+table(titanic$Sex, titanic$Title)
+
+```
+Plot bar graph:
+
+
+```{r Title 3, echo=TRUE}
+
+titanic %>% 
+  filter(!is.na(Survived)) %>%  
+  ggplot(aes(x=Title, fill=Survived))+
+  geom_bar(position='dodge')+
+  scale_fill_brewer(palette = 'Paired')
+
+```
+
+More men did not survive than females.
+
+
+### 2.9 Passenger Sex:
+
+
+Check if Sex determined death or survival.
+
+
+
+```{r Sex, echo=TRUE}
+
+titanic %>% 
+  filter(!is.na(Survived)) %>%  
+  ggplot(aes(x=Sex, fill=Survived)) +
+  geom_bar(position='dodge') +
+  scale_fill_brewer(palette = 'Pastel1') + 
+  facet_wrap(~Pclass, nrow=3, scales = "free_y")
+
+```
+
+Sex certainly determined survival. More men died than females in all the classes.
+
+
+### 2.10 Passenger Family Size:
+
+
+Check if family size determined death or survival. Combine the Parch and SibSp variables.
+
+
+```{r Family Size, echo=TRUE}
+
+titanic$Family = titanic$SibSp + titanic$Parch + 1
+
+titanic %>% 
+  filter(!is.na(Survived)) %>%  
+  ggplot(aes(x=Family, fill=Survived)) +
+  geom_bar(position='dodge') +
+  scale_fill_brewer(palette = 'Set2')
+
+```
+
+If you had no family onboard, your chances of survival was worse. Smaller family units (2-4) had better odds of survival. However, large family units (5+) did not.
+
+### 2.11 Passenger Age:
+
+
+Check if Age determined death or survival.
+
+
+```{r Age, echo=TRUE}
+
+titanic <- titanic %>% 
+  mutate(Age_Group = case_when(Age < 16 ~ "0-15",
+                               Age >= 16 & Age < 20 ~ "16-19",
+                               Age >= 20 & Age < 24 ~ "20-23",
+                               Age >= 24 & Age < 30 ~ "24-29",
+                               Age >= 30 & Age < 40 ~ "30-39",
+                               Age >= 40 & Age < 55 ~ "40-54",
+                               Age >= 55 ~ "55+"))
+titanic %>% count(Age_Group)
+
+titanic %>% 
+  filter(!is.na(Survived)) %>% 
+  ggplot(aes(x = Age_Group, fill=Survived))+
+  geom_bar(position='dodge')+
+  scale_fill_brewer(palette = 'Set3')
+
+```
+The group with the best survival rate were children 15 and under. The worst were people in their 20s. Majority of people over 55 did not survive. The older one got, the worse their chances of survival.
+
+
+### 2.12 Embarked:
+
+
+Check if place of embankment affected chances of survival.
+
+
+```{r Embarked, echo=TRUE}
+
+titanic %>% 
+  filter(!is.na(Survived)) %>% 
+  ggplot(aes(x=Embarked, fill=Survived)) +
+  geom_bar(position = 'dodge')+
+  scale_fill_brewer(palette = 'Set1')
+
+```
+
+
+
+There is no relationship between embarked place and survival.
+
+## 3. Summary
+
+To conclude, the most important predictors as established from our EDA are age, sex, family size (given by SibSp and Parch) and wealth (or the class in which you were).
+
+
