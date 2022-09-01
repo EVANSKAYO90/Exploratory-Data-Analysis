@@ -1,0 +1,858 @@
+---
+title: 'Prosper: Descriptive Statistics and Explorations'
+author: "Arnold Chamber"
+date: "3/19/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F, cache = F, fig.height = 7, fig.width = 10)
+
+```
+
+## 1.Introduction
+
+### 1.1. About Prosper
+
+Founded in 2005, Prosper is the first peer-to-peer lending marketplace in the United States. Over the years, Prosper has facilitated over 20 billion dollars in loans to more than 1.2 million people. Borrowers apply online for a fixed-rate, fixed-term loan between 2,000 dollars and 40,000 dollars. Individuals and institutions can invest in the loans and earn attractive returns. Prosper provides investors direct, low cost access to high-yield consumer loans from creditworthy borrowers. 
+
+We have been provided with sample data of Prosper's borrowers. The ultimate aim of this project is to utilize this dataset to create a model that will help predict whether a borrower will default on their loan or not. To achieve this end, we will first need to analyze the data in order to get a deeper understanding of the different features and how they will contribute to the predictive power of the model that we will seek to generate.
+
+The process of exploring the data will fall into these categories:
+
+1. Data overview
+2. Data Manipulation
+3. Descriptive statistics
+4. Missing value analysis
+5. Outlier Analysis
+6. Univariate plots and analysis
+7. Bivariate plots and analysis
+8. Multivariate plots and analysis
+9. Conclusion
+
+```{r Libraries}
+
+
+library(naniar) #missing values
+library(DataExplorer) #visualization
+library(mice) #missing data imputation
+library(leaflet)
+library(tidyverse)
+library(ggmap)
+library(leaflet.extras)
+library(htmltools)
+library(maps)
+library(mapproj)
+library(mapdata)
+library(usmap)
+library(caret)
+library(psych)
+
+```
+
+# Data
+
+```{r data}
+
+prosper <- read.csv("prosper.csv") # load data
+
+```
+
+# Dimensions
+
+```{r Dimension}
+
+dim(prosper) #check dimension                
+
+```
+
+### 1.2. Data Overview
+
+The dataset provided contains 18,978 observations with 30 different features. The dataset contains 4 identity variables, 3 loan performance related variables, and 23 input variables. 
+
+### 1.3. Preliminary observations from Data
+
+The data dictionary provided allows us to these preliminary observations:
+
+1. The ID variables will not contribute to the predictive power of the resultant model. In essence, they will have to be dropped.
+
+2. The performance variables will have to be further investigated. If high correlation exists between them, it may lead to multicolinearity issues in the model building process. We will investigate which performance variable to drop on the basis of this investigation.
+
+3. There are character variables in the dataset. These are categorical variables that will have to be converted to factor variables for further visualization and modeling after further investigation.
+
+4. The income variable seems to be a categorical variable. Based on  amount borrowed and the debt-to-income ratio, we will be able to determine how categorization was done. Whether 0 is greater than 5 or otherwise. 
+
+Observing the data structure in R, we can straight away see that there are a number of missing values in the data. We will utilize MICE extensions in R to impute missing data using predictive mean matching.
+
+Eyeballing the data on Excel reveals the below:
+
+1. The borrower city is a character variable with most of its values missing. However, the state variable (another character variable) has a majority of its values in place. We may need to drop the borrower city variable.
+2. Debt-to-income ratio is a measure of a borrower's liquidity. It is a represents the proportion of a borrower's income that goes towards servicing debt. A high debt-to-income ratio signifies higher default risk than a low debt-to-income ratio.
+3. The listing key, listing number, member key and loan key are ID variables and may need to be dropped as they do not contribute to overall model predictive power.
+4. DPD and LPStatus are 100% correlated and are both a measure of loan performance. To avoid multicolinearity issues, we will drop the character variable(LpStatus).
+
+An observation of the data types contained in the dataset reveals that there are integer, boolean, character and numeric variables in the dataset. Certain charater variables such as LpStatus and BorrowerState should be considered to be categorical / factor variables.
+
+## 2. Data Manipulation
+
+Data manipulation will help to prepare the data for further analysis. As observed above, we will need to drop the below variables as they have little to know impact on the model building process:
+
+1. BorrowerCity
+2. ListingKey
+3. ListingNumber
+4. MemberKey
+5. LoanKey
+6. FirstRecordedCreditLine
+7. LpStatus
+
+# 2.1. Drop Data
+
+```{r Drop Data}
+
+prosper2 <- subset(prosper, select = -c(BorrowerCity,ListingKey,ListingNumber,MemberKey,LoanKey,FirstRecordedCreditLine))                
+```
+
+After dropping the 5 variables named above, we are left with 24 variables of 18,987 observations.After this, we will need to convert Income, BorrowerState, Bad, BorrowerOccupation,EmploymentStatus, and IsBorrowerHomeowner into factor variables.
+
+```{r Factor Variables}
+
+prosper2$BorrowerState <- as.factor(prosper2$BorrowerState) 
+prosper2$IsBorrowerHomeowner<- as.factor(prosper2$IsBorrowerHomeowner)   
+prosper2$EmploymentStatus <- as.factor(prosper2$EmploymentStatus)   
+prosper2$Income <- as.factor(prosper2$Income)   
+prosper2$Bad <- as.factor(prosper2$Bad) 
+prosper2$BorrowerOccupation <- as.factor(prosper2$BorrowerOccupation) 
+
+```
+
+Right off the bat, we notice that BorrowerState has 53 levels. It is known that the Unites States has 50 States. We will need to investigate whether there may be a typo in the states names or if they refer to US territories outside of US geographical boundaries.
+
+```{r Factor Variables}
+
+levels(prosper2$BorrowerState) #Check unique values
+
+```
+
+We can observe that the data includes data of borrowers from US military installations around the globe. AA stands for US Armed Forces - Americas, AE stands for US Armed Foreces Europe, and AP stands for US Armed Forces - Pacific. We will investigate the relative proportion of borrowers from each state or territory. We have data from all 50 states of the US including 3 military regions.
+
+# 3. Descriptive Statistics
+
+Descriptive statistics is the process of quantitatively describing features from a collection of data using measures of frequency, central tendency, dispersion and position. In R, we will use the describe() function to generate summary statistics for the numerical data.
+
+```{r Factor Variables}
+
+pd <- as.data.frame(describe(prosper2, IQR = TRUE))
+pd2 <- as.data.frame(describe(prosper2, IQR = TRUE))
+write_csv(pd, "/Volumes/SCHOOL DRIVE/Data Science School Work/Data Science Assignments/Arnold Chamber/Prosper Descriptive Statistics/DescriptiveStats4.csv")
+
+
+```
+
+DebtToIncomeRatio: The average debt-to-income ratio is 0.344 indicative of a relatively risky portfolio. 34% of prosper's borrowers total income goes towards servicing of loans. The highest ratio is 10, while the lowest is 0. 
+
+AmountRemaining: No borrower has any amount remaining. It can be seen that all the values in this variable are zeros hence indicative of fact that its contribution to model building will be very low. 
+
+AmountBorrowed: On average, the borrowers in this dataset borrowed $6,476. The highest amount borrowed was 25,000 dollars while the least amount borrowed was 1,000 dollars. The median borrowed amount was 5,000 dollars.
+
+CurrentDelinquencies:On average the borrowers had at least 1 delinquent account at the time of loan application. The borrower with the most delinquant accounts at the time of account opening had 64 delinquent accounts.
+
+DelinquenciesLast7Years: Borrowers had at least 6 delinquencies over the 7 years preceding their  application. The borrower with the most delinquencies in 7 years had 99 delinquencies.
+
+PublicRecordsLast10Years: Borrowers had 0 on average, O public records in the 10 years preceding their application. It is however, interesting to note that a borrower had 30 within the same time frame.
+
+TotalCreditLines: Borrowers had 24 credit lines on average. The borrower with the most credit lines had 129 while the least had 2.
+
+InquiriesLast6Months: On average, borrowers had 2 credit inquiries over the last 6 months. It can, however, be noted that a borrower made a total of 105 credit inquiries over the same period. This observation is most certainly an outlier and will have to be dealt with during the data cleaning stage.
+
+AmountDelinquent: The refers to the amounts that are behind on installment payment. On average, each borrower had 1,281 dollars in delinquent amounts. The borrower with the highest delinquent amount had 444,745 dollars in delinquency.
+
+PublicRecordsLast12Months: Borrowers had 0 on average, O public records in the 12 months preceding their application. It is however, interesting to note that a borrower had 7 public records within the same time frame.
+
+CurrentCreditLines:These refer to credit lines whose payments are current. On average, borrowers had 9 current credit lines with the highest having 52 credit lines.
+
+OpenCreditLines: On average borrowers had 8 total credit lines. The most had 48 total credit lines.
+
+RevolvingCreditBalance:On average, borrowers had 15,914 dollars in revolving credit. The borrower with the highest RCB had 1,435,667 dollars in revolving credit. The range for this variable is also quite large as a borrower had no RCB.
+
+BankCardUtilization:On average, borrowers use 56% of all credit available to them on credit cards. The highest spend on credit was made by a customer who used 500% of the credit available to them.
+
+LengthStatusMonths:On average, borrowers have been at their current employment positions for 23 months. The borrower who has spent the most time at their current work place has spent over 4 years (554 months).
+
+DPD:On average, borrowers have been late on their installment by 2 months(62 days). However, there is a borrower that has delayed payments spanning over 4 years (516 months)
+
+PrincipalBalance: On average, borrowers have 3,917 dollars left as principal balance. The highest principal balance is 24,000 dollars and least is 0.
+
+## Remove Amount Remaining
+
+```{r Amount Remaining}
+
+prosper2 <- subset(prosper2, select = -c(AmountRemaining))                
+
+```
+
+# 4. Missing Value Analysis:
+
+Missing values have the potential of creating several problems in analysis and modeling. First, the absence of data reduces statistical power or can cause bias in the estimation of parameters. Overall, missing values can also reduce the representitiveness of the samples. We will investigate whethere there are missing values in our dataset.
+
+```{r Missing}
+
+library(ggplot2)
+plot_missing(prosper2, geom_label_args = list("size" = 2, "label.padding" = unit(0.1, "lines")))
+
+```
+BankUtilization, RevolvingCreditBalance, OpenCreditLines, CurrentCreditLines, PublicRecordsLast12Months and AmountDelinquent each have have 21.62% of their data missing. DebtToIncomeRatio is missing 3.47% of its data, while InquiriesLast6Months, TotalCreditLines, PublicRecordsLast10Years, DelinquenciesLast7Years and CurrentDelinquencies are missing 0.32% of their data. The other variables all have 100% of their data. The fact that BankUtilization, RevolvingCreditBalance, OpenCreditLines, CurrentCreditLines, PublicRecordsLast12Months all have exactly 21.62& of their data missing implies that the data is Missing Not At Random (MNAR). We will hence proceed to estimate the missing values through predictive mean matching.
+
+
+```{r Missing_Estimate}
+
+impute <- mice(prosper2, method="cart", seed = 222) #impute the missing values using predictive mean matching
+             
+```
+```{r Missing_Estimate}
+
+prosper3 <- complete(impute,1) #save the completion in prosper3
+
+plot_missing(prosper3, geom_label_args = list("size" = 2, "label.padding" = unit(0.1, "lines")))
+             
+```
+
+After the imputation of the missing values, there are now no missing values in our dataset.
+
+# Outlier Analysis:
+
+Outliers can be dangerous for any analysis because most statistical parameters such as mean, standard deviation and correlation are highly sensitive to outliers. We will need to check for and deal with put forward ways of dealing with outliers.
+
+```{r Boxplots}
+
+boxplot(prosper3$DebtToIncomeRatio, main= "DebtToIncomeRatio", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$AmountBorrowed,main= "AmountBorrowed", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$CurrentDelinquencies,main= "CurrentDelinquencies", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$DelinquenciesLast7Years,main= "DelinquenciesLast7Years", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$PublicRecordsLast10Years,main= "PublicRecordsLast10Years", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$TotalCreditLines,main= "TotalCreditLines", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$InquiriesLast6Months,main= "InquiriesLast6Months", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$AmountDelinquent,main= "AmountDelinquent", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$OpenCreditLines,main="OpenCreditLines",col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$RevolvingCreditBalance,main= "OpenCreditLines", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$BankcardUtilization,main= "BankcardUtilization", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$LengthStatusMonths,main= "LengthStatusMonths", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$DPD,main= "DPD", col = c("orange", "red"),horizontal = TRUE)
+boxplot(prosper3$PrincipalBalance,main= "PrincipalBalance", col = c("orange", "red"), horizontal = TRUE)
+             
+```
+It can be observed that all numeric features have outliers. We will write a function that replaces outliers with the 5th and 9th percentile of each feature. 
+
+```{r Boxplots}
+
+Q <- quantile(prosper3$DebtToIncomeRatio, probs=c(.25, .75), na.rm = FALSE)
+iqr <- IQR(prosper3$DebtToIncomeRatio)
+up <-  Q[2]+1.5*iqr # Upper Range  
+low<- Q[1]-1.5*iqr # Lower Range
+prosper4 <- subset(prosper3,prosper3$DebtToIncomeRatio> (Q[1] - 1.5*iqr) & prosper3$DebtToIncomeRatio < (Q[2]+1.5*iqr))
+
+Q1 <- quantile(prosper4$AmountBorrowed, probs=c(.25, .75), na.rm = FALSE)
+iqr1 <- IQR(prosper4$AmountBorrowed)
+up1 <-  Q1[2]+1.5*iqr1 # Upper Range  
+low1<- Q1[1]-1.5*iqr1 # Lower Range
+
+prosper5 <- subset(prosper4,prosper4$AmountBorrowed> (Q1[1] - 1.5*iqr1) & prosper4$AmountBorrowed < (Q1[2]+1.5*iqr1))
+
+Q2 <- quantile(prosper5$CurrentDelinquencies, probs=c(.25, .75), na.rm = FALSE)
+iqr2 <- IQR(prosper5$CurrentDelinquencies)
+up2 <-  Q2[2]+1.5*iqr2 # Upper Range  
+low2<- Q2[1]-1.5*iqr2 # Lower Range
+
+prosper6 <- subset(prosper5,prosper5$CurrentDelinquencies> (Q2[1] - 1.5*iqr2) & prosper5$CurrentDelinquencies < (Q2[2]+1.5*iqr2))
+
+Q3 <- quantile(prosper6$DelinquenciesLast7Years, probs=c(.25, .75), na.rm = FALSE)
+iqr3 <- IQR(prosper6$DelinquenciesLast7Years)
+up3 <-  Q3[2]+1.5*iqr3 # Upper Range  
+low3<- Q3[1]-1.5*iqr3 # Lower Range
+
+prosper7 <- subset(prosper6,prosper6$DelinquenciesLast7Years> (Q3[1] - 1.5*iqr3) & prosper6$DelinquenciesLast7Years < (Q3[2]+1.5*iqr3))
+
+Q4 <- quantile(prosper7$PublicRecordsLast10Years, probs=c(.25, .75), na.rm = FALSE)
+iqr4 <- IQR(prosper3$PublicRecordsLast10Years)
+up4 <-  Q4[2]+1.5*iqr4 # Upper Range  
+low4<- Q4[1]-1.5*iqr4 # Lower Range
+
+prosper8 <- subset(prosper7,prosper7$PublicRecordsLast10Years> (Q4[1] - 1.5*iqr4) & prosper7$PublicRecordsLast10Years< (Q4[2]+1.5*iqr4))
+
+Q5 <- quantile(prosper8$TotalCreditLines, probs=c(.25, .75), na.rm = FALSE)
+iqr5 <- IQR(prosper8$TotalCreditLines)
+up5 <-  Q5[2]+1.5*iqr5 # Upper Range  
+low5<- Q5[1]-1.5*iqr5 # Lower Range
+
+prosper9 <- subset(prosper8,prosper8$TotalCreditLines> (Q5[1] - 1.5*iqr5) & prosper8$TotalCreditLines < (Q5[2]+1.5*iqr5))
+
+Q6 <- quantile(prosper9$InquiriesLast6Months, probs=c(.25, .75), na.rm = FALSE)
+iqr6 <- IQR(prosper9$InquiriesLast6Months)
+up6 <-  Q6[2]+1.5*iqr6 # Upper Range  
+low6<- Q6[1]-1.5*iqr6 # Lower Range
+
+prosper10 <- subset(prosper9,prosper9$InquiriesLast6Months> (Q6[1] - 1.5*iqr6) & prosper9$InquiriesLast6Months< (Q6[2]+1.5*iqr6))
+
+Q7 <- quantile(prosper10$OpenCreditLines, probs=c(.25, .75), na.rm = FALSE)
+iqr7 <- IQR(prosper10$OpenCreditLines)
+up7 <-  Q7[2]+1.5*iqr7 # Upper Range  
+low7<- Q7[1]-1.5*iqr7 # Lower Range
+
+prosper11 <- subset(prosper10,prosper10$OpenCreditLines> (Q7[1] - 1.5*iqr7) & prosper10$OpenCreditLines < (Q7[2]+1.5*iqr7))
+
+Q8 <- quantile(prosper11$BankcardUtilization, probs=c(.25, .75), na.rm = FALSE)
+iqr8 <- IQR(prosper4$AmountBorrowed)
+up8 <-  Q8[2]+1.5*iqr8 # Upper Range  
+low8<- Q8[1]-1.5*iqr8 # Lower Range
+
+prosper12 <- subset(prosper11,prosper11$BankcardUtilization> (Q8[1] - 1.5*iqr8) & prosper11$BankcardUtilization < (Q8[2]+1.5*iqr8))
+
+Q9 <- quantile(prosper12$RevolvingCreditBalance, probs=c(.25, .75), na.rm = FALSE)
+iqr9 <- IQR(prosper12$RevolvingCreditBalance)
+up9 <-  Q9[2]+1.5*iqr9 # Upper Range  
+low9<- Q9[1]-1.5*iqr9 # Lower Range
+
+prosper13 <- subset(prosper12,prosper12$RevolvingCreditBalance> (Q9[1] - 1.5*iqr9) & prosper12$RevolvingCreditBalance < (Q9[2]+1.5*iqr9))
+
+Q10 <- quantile(prosper13$LengthStatusMonths, probs=c(.25, .75), na.rm = FALSE)
+iqr10 <- IQR(prosper13$LengthStatusMonths)
+up10 <-  Q10[2]+1.5*iqr10 # Upper Range  
+low10<- Q10[1]-1.5*iqr10 # Lower Range
+
+prosper14 <- subset(prosper13,prosper13$LengthStatusMonths> (Q10[1] - 1.5*iqr10) & prosper13$LengthStatusMonths < (Q10[2]+1.5*iqr10))
+
+Q11 <- quantile(prosper14$PrincipalBalance, probs=c(.25, .75), na.rm = FALSE)
+iqr11 <- IQR(prosper14$PrincipalBalance)
+up11 <-  Q11[2]+1.5*iqr11 # Upper Range  
+low11<- Q11[1]-1.5*iqr11 # Lower Range
+
+prosper15 <- subset(prosper14,prosper14$PrincipalBalance> (Q11[1] - 1.5*iqr11) & prosper14$PrincipalBalance < (Q11[2]+1.5*iqr11))
+
+```
+
+After removal of all outliers, we remain with a dataframe of 7792 observations across 23 variables.
+
+
+# Univariate Plots and Analysis:
+
+Now that we have imputed missing values and removed outliers from the datasets. We would like to look at the plots of each individual feature. 
+
+Categorical Variables:
+
+We will employ the use of bar plots to plot the distribution of categorical features.
+
+Distribution of Bad v Good Loans
+
+```{r Missing_Estimate}
+
+ggplot(prosper15, aes(as.factor(Bad))) + #plot distribution
+  geom_bar(aes(y=..count../sum(..count..),fill=as.factor(Bad))) + 
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+ labs(y = "Proportion of Bad Loans Against Good Loans") + labs(x="Loan Category") 
+             
+```
+It can be observed that there are much fewer bad loans than good loans. These are signs of a healthy loan book. However, we will need to factor this class imbalance when doing the modeling. We expect that this class imbalanced might lead to a biased model that has the stronger ability to predict class 1 that that of predicting class 0.
+
+Distribution of Home Owners v Non-HomeOwners
+
+```{r Missing_Estimate}
+levels(prosper15$IsBorrowerHomeowner)[which(levels(prosper15$IsBorrowerHomeowner)=="TRUE")] <- "1"
+
+levels(prosper15$IsBorrowerHomeowner)[which(levels(prosper15$IsBorrowerHomeowner)=="FALSE")] <- "0"
+
+ggplot(prosper15, aes(as.factor(IsBorrowerHomeowner))) + #plot distribution
+  geom_bar(aes(y=..count../sum(..count..),fill=as.factor(IsBorrowerHomeowner))) + 
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+ labs(y = "Proportion of Home Owners Against Non-Home Owners") + labs(x="Home Ownership")
+             
+```
+
+It can be observed that the number of home owners is almost half of those that do not own homes. This feature is not balanced. We will aim to investigate later whether home ownership contributes to whether a borrower will be risky or not.
+
+Distribution of Employment Status
+
+```{r Employment Status}
+
+ggplot(prosper15, aes(as.factor(EmploymentStatus))) + #plot distribution
+  geom_bar(aes(y=..count../sum(..count..),fill=as.factor(EmploymentStatus))) + 
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+ labs(y = "Proportion of Type of Employment") + labs(x="Employment Status")
+             
+```
+Distribution of Income Levels
+
+```{r Income Levels}
+
+ggplot(prosper15, aes(as.factor(Income))) + #plot distribution
+  geom_bar(aes(y=..count../sum(..count..),fill=as.factor(Income))) + 
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+ labs(y = "Distribution of Income Levels") + labs(x="Income Levels")
+             
+```
+
+The highest number of borrowers are contained in income level 2. Income level 0 comes in second while income level 4 is in at third.
+
+Distribution of Occupation
+
+```{r Occupation}
+
+ggplot(prosper15, aes(as.factor(BorrowerOccupation))) + #plot distribution
+  geom_bar(aes(y=..count../sum(..count..),fill=as.factor(BorrowerOccupation))) + 
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+ labs(y = "Distribution of Borrower Occupation") + labs(x="Borrower Occupation")
+             
+```
+
+For the majority of borrowers, their occupation was recorded as being "Professional that is not part of t". This is quite unclear for a large portion of the data. This in itself bars us from having quality data that can shed more light into the profile of borrowers on the prosper loan book. Systems need to be changed or updated in order to accurately capture employment details.
+
+Numerical variables:
+
+We will employ the use of histograms to plot the numeric features in the dataset:
+
+1. Debt To Income Ratio
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=DebtToIncomeRatio)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+2. Amount Borrowed
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=AmountBorrowed)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+2. Current Delinquencies
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=CurrentDelinquencies)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Delinquencies Last 7 Years
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=DelinquenciesLast7Years)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Public Records Last 10 Years
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=PublicRecordsLast10Years)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Total Credit Lines
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=TotalCreditLines)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Inquiries Last 6 Months
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=InquiriesLast6Months)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Amount Delinquent
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=AmountDelinquent)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Public Records Last 12 Months
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=PublicRecordsLast12Months)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Current Credit Lines
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=CurrentCreditLines)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Open credit Lines
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=OpenCreditLines)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Revolving Credit Balance
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=RevolvingCreditBalance)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Bank Card Utilization
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=BankcardUtilization)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. Length Status Months
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=LengthStatusMonths)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+3. DPD
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=DPD)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+4. Principal Balance
+
+```{r Occupation}
+
+# Histogram with density plot
+ggplot(prosper15, aes(x=PrincipalBalance)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") 
+             
+```
+
+Bivariate Plots and Analysis
+
+1. US State & Principal Balance
+
+```{r US State}
+
+geog_prosper <- subset(prosper15, select = c(BorrowerState,PrincipalBalance))
+geog_prosper<- droplevels(geog_prosper[!geog_prosper$BorrowerState == 'AA',])
+geog_prosper<- droplevels(geog_prosper[!geog_prosper$BorrowerState == 'AE',])
+geog_prosper<- droplevels(geog_prosper[!geog_prosper$BorrowerState == 'AP',])
+geog_prosper <- geog_prosper %>%
+  rename(state = BorrowerState)
+balance_p<-plot_usmap(data = geog_prosper, values = "PrincipalBalance", color = "blue",labels = TRUE, size=0.1) + 
+  scale_fill_continuous(low = "white", high = "blue", name = "Principal Balance", label = scales::comma) + 
+  labs(title = "Total Principal Balance by State", subtitle = "States Do Not Include Military Territories") +
+  theme(legend.position = "right")
+
+balance_p$layers[[2]]$aes_params$size <- 1.5
+print(balance_p)
+
+
+```
+
+From the map visual above,it can be seen that Idaho has the highest amounts of principal balance. This is followed by Nevada, Alabama, Colorado, Wyoming and Alsaska.  Arizona, Ohio, Illinois, Vermont have the least amount of principal balance.
+
+1. US State & Amount Borrowed
+
+```{r US State& Amount Borrowed}
+
+geog_prosper_borrowed <- subset(prosper15, select = c(BorrowerState,AmountBorrowed))
+
+geog_prosper_borrowed<- droplevels(geog_prosper_borrowed[!geog_prosper_borrowed$BorrowerState == 'AA',])
+geog_prosper_borrowed<- droplevels(geog_prosper_borrowed[!geog_prosper_borrowed$BorrowerState == 'AE',])
+geog_prosper_borrowed<- droplevels(geog_prosper_borrowed[!geog_prosper_borrowed$BorrowerState == 'AP',])
+
+geog_prosper_borrowed <- geog_prosper_borrowed %>%
+  rename(state = BorrowerState)
+borrowed_p <-plot_usmap(data = geog_prosper_borrowed, values = "AmountBorrowed", color = "red",labels = TRUE, size=0.1)  +
+  scale_fill_continuous(low = "white", high = "red", name = "AmountBorrowed", label = scales::comma) + 
+  labs(title = "Total Amount Borrowed by State", subtitle = "States Do Not Include Military Territories") +
+  theme(legend.position = "right")
+
+borrowed_p$layers[[2]]$aes_params$size <- 1.5
+print(borrowed_p)
+
+```
+
+As expected, Idaho has the highest amount of borrowed funds. This is followed by Wyoming, Nevada, Wyoming and Colorado. Mid-western states seem to be the most loyal borrowers on Prosper. Alsaska, New York and Georgia also hold a large portion of these borrowed sums.
+
+1. US State & Delinquencies
+
+```{r US State& Delinquencies}
+
+geog_prosper_delinquent <- subset(prosper15, select = c(BorrowerState,AmountDelinquent))
+
+geog_prosper_delinquent<- droplevels(geog_prosper_delinquent[!geog_prosper_delinquent$BorrowerState == 'AA',])
+geog_prosper_delinquent<- droplevels(geog_prosper_delinquent[!geog_prosper_delinquent$BorrowerState == 'AE',])
+geog_prosper_delinquent<- droplevels(geog_prosper_delinquent[!geog_prosper_delinquent$BorrowerState == 'AP',])
+
+geog_prosper_delinquent <- geog_prosper_delinquent %>%
+  rename(state = BorrowerState)
+delinquencies_p<-plot_usmap(data = geog_prosper_delinquent, values = "AmountDelinquent", color = "orange",labels = TRUE)  +
+  scale_fill_continuous(low = "white", high = "orange", name = "AmountDelinquent", label = scales::comma) + 
+  labs(title = "Total delinquent Amounts by State", subtitle = "States Do Not Include Military Territories") +
+  theme(legend.position = "right")
+
+delinquencies_p$layers[[2]]$aes_params$size <- 1.5
+print(delinquencies_p)
+
+
+```
+
+The respective states have very low levels of delinquency. It is, however, noted that the states of Colorado and Virginia have the highest rate of delinquency. 
+
+1. US State & Revolving Credit Balance
+
+```{r US State& Revolving}
+
+geog_prosper_rcb <- subset(prosper15, select = c(BorrowerState,RevolvingCreditBalance))
+
+geog_prosper_rcb<- droplevels(geog_prosper_rcb[!geog_prosper_rcb$BorrowerState == 'AA',])
+geog_prosper_rcb<- droplevels(geog_prosper_rcb[!geog_prosper_rcb$BorrowerState == 'AE',])
+geog_prosper_rcb<- droplevels(geog_prosper_rcb[!geog_prosper_rcb$BorrowerState == 'AP',])
+
+geog_prosper_rcb <- geog_prosper_rcb %>%
+  rename(state = BorrowerState)
+revolving_p<-plot_usmap(data = geog_prosper_rcb, values = "RevolvingCreditBalance", color = "green",labels = TRUE)  +
+  scale_fill_continuous(low = "white", high = "green", name = "RevolvingCreditBalance", label = scales::comma) + 
+  labs(title = "Total Revolving Credit Balance by State", subtitle = "States Do Not Include Military Territories") +
+  theme(legend.position = "right")
+
+revolving_p$layers[[2]]$aes_params$size <- 1.5
+print(revolving_p)
+
+
+```
+
+Wyoming, Nebraska, Arizona, Indiana and Kentucky seem to have the highest rates of delinquency. Colorado, Utah, Kansas and Oklahoma on the other hand, have the lowest levels of delinquency.
+
+Military States and Principal Balance
+
+```{r US State}
+
+geog_prosper_military <- subset(prosper15, select = c(BorrowerState,PrincipalBalance))
+geog_prosper_militaryAA<- droplevels(geog_prosper_military[geog_prosper_military$BorrowerState == 'AA' |geog_prosper_military$BorrowerState == 'AE'|geog_prosper_military$BorrowerState == 'AP',])
+ggplot(geog_prosper_militaryAA, aes(as.factor(BorrowerState))) + #plot distribution
+  geom_bar(aes(y=..count../sum(..count..),fill=as.factor(BorrowerState))) + 
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+ labs(y = "Distribution of Military Territory") + labs(x="Military Territory")
+
+```
+American Armed Foreces in the Europe and American Armed Foreces in the Pacific seem to have the same level of representation in the number of borrowers. This representation is, however, higher than representation of American Armed Foreces in the Americas.
+
+## Multivariate Plots and Analysis
+
+Amount Borrowed and Debt to Income Ratio and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=DebtToIncomeRatio, y=AmountBorrowed, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+It can be observed that majority of good loans are concentrated at the bottom left of the graph. Indicative of the fact that a low debt to income ratio, coupled with low borrowed amounts is generally reliable indicator of a good loan.A high debt to income ratio and high amounts borrowed, are general indicators of a bad loan.
+
+Amount Borrowed and Principal Balance and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=TotalCreditLines, y=RevolvingCreditBalance, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+
+In this plot, the good loans are concentrated at the bottom of the plot. This shows that borrowers with a lower revolving credit balance tend to be more credit worthy than those with higher revolving credit balances. As the credit balances increases, the proportion of good loans decreases.
+
+Total Credit Lines, Bank Card Utilization and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=TotalCreditLines, y=BankcardUtilization, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+
+It can be observed that at higher bank card utilization rates, the proportion of good loans decreases. Also, as total credit lines increase, the proportion of good loans decreases. A good loan is indicated by low total credit lines and low bank card utilization.
+
+Inquiries, Loan amounts , and Bad Loans
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=InquiriesLast6Months, y=PrincipalBalance, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+
+It can be seen that good loans are concentrated on the left side of this chart. This is indicative of the fact that any customer who makes more than 6 credit inquiries over a 6 month period is a high risk customer. The higher the number of inquiries, the higher the risk. Also,a high principle balance is indicative of a very risky borrower.
+
+Amount Borrowed, Debt to Income Ratio and Income
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=DebtToIncomeRatio, y=AmountBorrowed, shape=Income, color=Income)) +
+  geom_point(size=1)
+
+```
+
+Given a high concentration of Income Levels 4 and 5 at the top of this graph, we can safely assume that the scale has been arranged in ascending order. 0 indicates the lowest income levels while 5 indicates the highest income level. This is because, if we assume best practice, huge loans will be issued to those with high income and low debt to income ratio.
+
+DPD, Principal Balance and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=DPD, y=PrincipalBalance, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+
+As expected, the higher the DPD the worse the loan. All good loans have a very low DPD. This phenomenon is applicable across all levels of principal balance.
+
+Amount Borrwed, Income Level and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=AmountBorrowed, y=Income, shape=Bad, color=Bad)) +
+  geom_boxplot()+geom_jitter(width = 0.1, alpha=0.2)
+
+```
+It can be observed that middle income earners are the least risk borrwers. Income Level 2 and 3 who borrowed high amounts seem to be the lowest risk customers. Income earners at level 0,1, and 2 tend to borrow less amounts than those at levels 3,4 and 5. However, those at level 7 tend to borrow the least of them all.The largest proportion of less risky borrowers fall under income level 6.
+
+Revolving Credit Balance, Principal Balance and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=RevolvingCreditBalance, y=PrincipalBalance, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+Borrowers with a very low revolving credit balance and a high principal balance seem to be the highest risk borrowers. However, borrowers iwth low Principal balance and low revolving credit balance tend to be the lowest risk borrowers.
+
+Debt to Income Ration, Amount Borrowed and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=DebtToIncomeRatio, y=AmountBorrowed, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+Low risk borrowers tend to borrow high amounts. As shown in the table, across all levels of debt-to-income ratio, borrowers that borrow high amounts tend to be less risky than those that borrow low amounts. 
+
+HomeOwner, Income and Bad
+
+```{r Occupation}
+             
+ggplot(prosper15, aes(x=Income, y=IsBorrowerHomeowner, shape=Bad, color=Bad)) +
+  geom_point(size=1)
+
+```
+
+CorrelationMatrix
+
+```{r Occupation}
+
+library(corrplot)
+corr_simple <- function(data=prosper15,sig=0.05){
+  #convert data to numeric in order to run correlations
+  #convert to factor first to keep the integrity of the data - each value will become a number rather than turn into NA
+  df_cor <- data %>% mutate_if(is.character, as.factor)
+  df_cor <- df_cor %>% mutate_if(is.factor, as.numeric)
+  #run a correlation and drop the insignificant ones
+  corr <- cor(df_cor)
+  #prepare to drop duplicates and correlations of 1     
+  corr[lower.tri(corr,diag=TRUE)] <- NA 
+  #drop perfect correlations
+  corr[corr == 1] <- NA 
+  #turn into a 3-column table
+  corr <- as.data.frame(as.table(corr))
+  #remove the NA values from above 
+  corr <- na.omit(corr) 
+  #select significant values  
+  corr <- subset(corr, abs(Freq) > sig) 
+  #sort by highest correlation
+  corr <- corr[order(-abs(corr$Freq)),] 
+  #print table
+  print(corr)
+  #turn corr back into matrix in order to plot with corrplot
+  mtx_corr <- reshape2::acast(corr, Var1~Var2, value.var="Freq")
+  
+  #plot correlations visually
+
+  corrplot(mtx_corr, is.corr=FALSE, tl.col="black", na.label=" ")
+}
+
+corr_simple()
+
+```
+
+CurrentCreditLines and OpenCreditLines have a high positive correlation of 0.95. AmountBorrowed and PrincipalBalance also have a very high correlation of 0.92. In the final dataset, I will have to drop one of each of these sets in order to avoid multicolinearity issues. It can be seen that DPD is the most correlated to the target variable "bad". In light of this, I will drop, current credit lines and amount borrowed. Also, since the LpStatus is derived from DPD, I will drop LpStatus and remain with DPD.
+
+Drop current credit lines, amount borrowed and lpStatus
+
+```{r Occupation}
+             
+prosper_final2 <- subset(prosper15, select = -c(LpStatus, CurrentCreditLines, AmountBorrowed))
+
+write_csv(prosper_final2, "/Volumes/SCHOOL DRIVE/Data Science School Work/Data Science Assignments/Arnold Chamber/Prosper Descriptive Statistics/ProsperFinal_2.csv")
+
+```
+
+The final dataset that will be ready for modelling will contain 20 variables from the original 30 variables.
+
+Conclusion
