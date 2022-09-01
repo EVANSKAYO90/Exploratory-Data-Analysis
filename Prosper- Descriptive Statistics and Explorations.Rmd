@@ -1,6 +1,6 @@
 ---
-title: 'Prosper: Descriptive Statistics and Explorations'
-author: "Arnold Chamber"
+title: 'Prosper: Descriptive Statistics and Exploratory Data Anlysis'
+author: "Evans Kayo"
 date: "3/19/2022"
 output: pdf_document
 ---
